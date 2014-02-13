@@ -17,8 +17,8 @@ import pickle
 # with cz plus whatever number is required to avoid overwriting existing files
 # inserted before the .tcx extension
 # better default saving - currently it just pickles to wherever the .py file is stored
-# this is hostile to multiple users and not useful for frozen versions (for
-# example pyinstaller would just write to a temp directory then delete it again)
+# this is hostile to multiple users. It does work perfectly for pyinstaller under
+# Win and Linux, though.
 # permit overlapping zones
 
 # global variables for GUI
@@ -98,7 +98,8 @@ class setZones(tkSimpleDialog.Dialog):
 
     def apply(self):
         strzones = ['']*(ztZ.nzones()+1)
-        print len(strzones)
+        if Debug:
+            print len(strzones)
         self.result=[]
         for loop in range(ztZ.nzones()+1):
             strzones[loop] = self.entries[loop].get()
@@ -277,7 +278,8 @@ class zoneTransformApp:
     def setZonesCallback(self):
         self.buttonSetZones.configure(relief='sunken')
         newzones = setZones(rootWin,title='Select your pace zones').result
-        print newzones
+        if Debug:
+            print newzones
         if newzones:
             self.refreshZones()
         self.buttonSetZones.configure(relief='raised')
@@ -385,8 +387,9 @@ class zoneTransformApp:
                 tkMessageBox.showinfo('Load zones failed','Saved zone file not found')
                 os.chdir(currwd)
                 return False
-            print len(a1)
-            print a2
+            if Debug:
+                print len(a1)
+                print a2
         except Exception as e:
             tkMessageBox.showerror('Load zones failed','Error '+str(e)+' reading zone config file')
             os.chdir(currwd)
