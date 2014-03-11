@@ -121,6 +121,12 @@ class zoneTransformApp:
         # initialise some variables
 
         currwd = os.getcwd()
+        
+        # Defined in the schema: maximum length of RestrictedToken_t is 15
+        # This code uses minidom which doesn't handle schemas, and is intended
+        # to process Training Center tcx data; since Training Center isn't 
+        # going to be updated further, hard-coding this value is fine
+        self.rttMaxLen = 15
 
         # if possible, check for config file containing user's selected zones
         try:
@@ -178,6 +184,11 @@ class zoneTransformApp:
         global currwd
         self.buttonRun.configure(relief='sunken')
         self.fpath = tkFileDialog.askopenfilename()
+        if self.fpath == '':
+            if Debug:
+                print 'Cancelled'
+            self.buttonRun.configure(relief='raised')
+            return
         (currwd,self.fname) = os.path.split(self.fpath)
         os.chdir(currwd)
         try:
@@ -212,10 +223,18 @@ class zoneTransformApp:
                 thisnode.setAttribute('xsi:type',u'CustomSpeedZone_t')
                 vChild = dom1.createElement('ViewAs')
                 try:
-                    if thisnode.parentNode.parentNode.parentNode.getAttribute('Sport') == 'Running':
+                    # number of levels depends on whether the step is repeated or not
+                    thisSport = thisnode.parentNode.parentNode.parentNode.getAttribute('Sport')
+                    if thisSport == '':
+                        thisSport = thisnode.parentNode.parentNode.parentNode.parentNode.getAttribute('Sport')
+                    if thisSport == 'Running':
                         vaChild = dom1.createTextNode('Pace')
+                        if Debug:
+                            print 'Sport: Running'
                     else:
                         vaChild = dom1.createTextNode('Speed')
+                        if Debug:
+                            print 'Sport:',thisSport
                 except Exception as e:
                     mstring= 'Exception '+str(e)+'encountered identifying workout sport.\n Defaulting to display as pace'
                     tkMessageBox.showerror('zonetransform',mstring)
@@ -252,10 +271,26 @@ class zoneTransformApp:
                     if thisnode.parentNode.nodeName == 'Workout':
                         for ssn in thisnode.childNodes:
                             if ssn.nodeName == '#text':
-                                oldName = ssn.nodeValue
-                                ssn.nodeValue = oldName+'cz'
                                 if Debug:
-                                    print oldName,ssn.nodeValue
+                                    print 'Original value:',ssn.nodeValue
+                                ssn.nodeValue = self.czName(ssn.nodeValue)
+                                if Debug:
+                                    print 'New value:',ssn.nodeValue
+                except:
+                    pass
+            for thisnode in dom1.getElementsByTagName('WorkoutNameRef'):
+                try:
+                    for ssn in thisnode.childNodes:
+                        if ssn.nodeName == 'Id':
+                            for scn in ssn.childNodes:
+                                if scn.nodeName == '#text':
+                                    if Debug:
+                                        print 'Original name:',scn.nodeValue
+                                    scn.nodeValue = self.czName(scn.nodeValue)
+                                    #oldName = scn.nodeValue
+                                    #scn.nodeValue = oldName+'cz'
+                                    if Debug:
+                                        print 'New name:',scn.nodeValue
                 except:
                     pass
 
@@ -267,12 +302,30 @@ class zoneTransformApp:
                 outname = namein+'cz'+str(badcount)+extin
                 if Debug:
                     print badcount,outname
-            with open(outname,'w') as xout:
-                dom1.writexml(xout,addindent='  ',newl='\n')
+            with open(outname,'wb') as xout:
+                dom1.writexml(xout,addindent=' ',newl='\n',encoding='utf-8')
             tkMessageBox.showinfo('zonetransform','Converted successfully as '+outname)
         if Debug:
             print 'done'
         self.buttonRun.configure(relief='raised')
+        
+    def czName(self,oldName):
+        if len(oldName) < self.rttMaxLen-1:
+            newName = oldName+'cz'
+        elif len(oldName) < self.rttMaxLen:
+            newName = oldName+'z'
+        elif len(oldName) == self.rttMaxLen:
+            newName = oldName[:-1]+'z'
+            tkMessageBox.showwarning('Possible naming clash','Name '+oldName+
+                ' was truncated by 1 character to rename to '+newName+
+                '\nPlease check this does not clash with existing workouts\n'+
+                'You should use workout names no longer than 13 characters')
+        else:
+            tkMessageBox.showerror('Invalid workout name',oldName+
+                ' is longer than the permitted 15 characters, name not modified')
+            newName = oldName
+                        
+        return newName
 
     # interfaces to dialog for setting zones
     def setZonesCallback(self):
